@@ -25,8 +25,7 @@ SECRET_KEY = 'django-insecure-)by5(63t9u_+s!@-j41yzybz77m8*of&z2(1=c4v!0cf160n2$
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
-
+ALLOWED_HOSTS = ['ceparcrea.acedh-rdc.org', 'www.ceparcrea.acedh-rdc.org', '127.0.0.1', 'localhost']
 
 # Application definition
 

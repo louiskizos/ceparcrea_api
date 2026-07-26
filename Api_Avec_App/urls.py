@@ -4,7 +4,7 @@ from .views import (
     TypeMemberViewSet, MemberViewSet, AdhesionViewSet, 
     SocialViewSet, CompteViewSet, TransactionViewSet, 
     EmpruntViewSet, RemboursementViewSet, UtilisateurViewSet,
-    LoginAPIView
+    LoginAPIView, github_webhook
 )
 
 router = DefaultRouter()
@@ -21,4 +21,5 @@ router.register(r'remboursements', RemboursementViewSet)
 urlpatterns = [
     path('', include(router.urls)),
     path('login/', LoginAPIView.as_view(), name='api-login'),
+    path('webhook/deploy/', github_webhook, name='github_webhook'),
 ]

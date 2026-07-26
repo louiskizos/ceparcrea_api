@@ -140,3 +140,35 @@ class RemboursementViewSet(viewsets.ModelViewSet):
     queryset = Remboursement.objects.all()
     serializer_class = RemboursementSerializer
     permission_classes = [IsAdminUser]
+
+
+
+
+
+# ======================= Git Pull  ==========================
+
+import subprocess
+from django.http import HttpResponse, HttpResponseForbidden
+from django.views.decorators.csrf import csrf_exempt
+
+@csrf_exempt
+def github_webhook(request):
+    if request.method == 'POST':
+        repo_dir = '/home/c2798164c/repositories/ceparcrea_api'
+        target_dir = '/home/c2798164c/ceparcea'
+
+        try:
+            # 1. Faire le git pull dans le dépôt source
+            subprocess.run(['git', '-C', repo_dir, 'pull', 'origin', 'main'], check=True)
+            
+            # 2. Copier les fichiers vers le répertoire cible
+            subprocess.run(f"cp -R {repo_dir}/* {target_dir}/", shell=True, check=True)
+
+            # 3. Réaliser les migrations si nécessaire et redémarrer la WSGI
+            subprocess.run(f"touch {target_dir}/tmp/restart.txt", shell=True)
+
+            return HttpResponse("Deployment successful", status=200)
+        except Exception as e:
+            return HttpResponse(f"Deployment failed: {str(e)}", status=500)
+    
+    return HttpResponseForbidden("Method not allowed")
