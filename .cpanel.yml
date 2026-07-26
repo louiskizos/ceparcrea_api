@@ -1,4 +1,4 @@
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/c2798164c/ceparcea/
+    - export DEPLOYPATH=/home/c2798164c/ceparcrea/
     - /bin/cp -R * $DEPLOYPATH
