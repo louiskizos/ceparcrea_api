@@ -27,7 +27,20 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['ceparcrea.acedh-rdc.org', 'www.ceparcrea.acedh-rdc.org', '127.0.0.1', 'localhost']
 
-# Application definition
+DEBUG = False
+
+
+# CORS CONFIG
+CORS_ALLOW_ALL_ORIGINS = True  # Note : Si c'est à True, CORS_ALLOWED_ORIGINS est ignoré, mais Django valide quand même la syntaxe.
+
+CORS_ALLOWED_ORIGINS = [
+    "https://acedh-rdc.org",
+    "https://www.acedh-rdc.org",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+    "https://aprepos.vercel.app",
+]
+
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -43,8 +56,23 @@ INSTALLED_APPS = [
 
 AUTH_USER_MODEL = 'Api_Avec_App.Utilisateur'
 
+CORS_ALLOW_CREDENTIALS = False
+SECURE_SSL_REDIRECT = False  
+CORS_ALLOW_HEADERS = [
+    "content-type",
+    "authorization",
+    "x-csrftoken",
+    "accept",
+    "origin",
+    "user-agent",
+]
+
+
+
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -84,10 +112,23 @@ WSGI_APPLICATION = 'Avec_api.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+
+
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'c2798164c_ceparcrea_db',
+        'USER': 'c2798164c_ceparcrea_user',
+        'PASSWORD': 'Admin_ceparcea@2026',
+        'HOST': '127.0.0.1',  # <-- Change 'localhost' par '127.0.0.1'
+        'PORT': '3306',
     }
 }
 
