@@ -112,25 +112,25 @@ WSGI_APPLICATION = 'Avec_api.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-
-
-
 # DATABASES = {
 #     'default': {
-#         'ENGINE': 'django.db.backends.mysql',
-#         'NAME': 'c2798164c_ceparcrea_db',
-#         'USER': 'c2798164c_ceparcrea_user',
-#         'PASSWORD': 'Admin_ceparcea@2026',
-#         'HOST': '127.0.0.1',  # <-- Change 'localhost' par '127.0.0.1'
-#         'PORT': '3306',
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
 #     }
 # }
+
+
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'c2798164c_ceparcrea_bd',
+        'USER': 'c2798164c_ceparcrea_user',
+        'PASSWORD': 'Admin_ceparcea@2026',
+        'HOST': '127.0.0.1',  # <-- Change 'localhost' par '127.0.0.1'
+        'PORT': '3306',
+    }
+}
 
 
 # Password validation
