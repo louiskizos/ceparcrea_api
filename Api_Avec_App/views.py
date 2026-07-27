@@ -8,12 +8,8 @@ from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
 from .models import TypeMember, Member, Adhesion, Social, Compte, Transaction, Emprunt, Remboursement, Utilisateur
-from .serializers import (
-    TypeMemberSerializer, MemberSerializer, AdhesionSerializer, 
-    SocialSerializer, CompteSerializer, TransactionSerializer, 
-    EmpruntSerializer, RemboursementSerializer, UtilisateurSerializer
-)
-
+from .serializers import *
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 
 class UtilisateurViewSet(viewsets.ModelViewSet):
