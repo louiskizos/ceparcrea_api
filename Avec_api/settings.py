@@ -145,7 +145,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # -------------------------------------------------------------
 
 LANGUAGE_CODE = 'fr-fr'
-TIME_ZONE = 'Africa/Goma'
+TIME_ZONE = 'Africa/Lubumbashi'
 USE_I18N = True
 USE_TZ = True
 
