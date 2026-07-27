@@ -74,6 +74,9 @@ from rest_framework.response import Response
 
 from django.db.models import Sum
 from django.db.models.functions import ExtractYear
+import subprocess
+from django.http import HttpResponse, HttpResponseForbidden
+from django.views.decorators.csrf import csrf_exempt
 
 from .models import (
     TypeMember, Member, Adhesion, Social, 
@@ -92,6 +95,13 @@ class TypeMemberViewSet(viewsets.ModelViewSet):
     queryset = TypeMember.objects.all()
     serializer_class = TypeMemberSerializer
     pagination_class = StandardResultsSetPagination
+    from rest_framework.permissions import IsAuthenticatedOrReadOnly
+
+class TypeMemberViewSet(viewsets.ModelViewSet):
+    queryset = TypeMember.objects.all()
+    serializer_class = TypeMemberSerializer
+    pagination_class = StandardResultsSetPagination
+    permission_classes = [IsAuthenticatedOrReadOnly] # Permet le GET public
 
 
 # 2. MEMBER
@@ -230,9 +240,6 @@ def statistiques_totaux(request):
 
 # ======================= Git Pull  ==========================
 
-import subprocess
-from django.http import HttpResponse, HttpResponseForbidden
-from django.views.decorators.csrf import csrf_exempt
 
 @csrf_exempt
 def github_webhook(request):
