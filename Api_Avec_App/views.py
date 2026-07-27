@@ -68,81 +68,164 @@ class LoginAPIView(APIView):
             )
 
 
+from rest_framework import viewsets, filters, status
+from rest_framework.decorators import action, api_view
+from rest_framework.response import Response
+
+from django.db.models import Sum
+from django.db.models.functions import ExtractYear
+
+from .models import (
+    TypeMember, Member, Adhesion, Social, 
+    Compte, Transaction, Emprunt, Remboursement
+)
+from .serializers import (
+    TypeMemberSerializer, MemberSerializer, AdhesionSerializer,
+    SocialSerializer, CompteSerializer, TransactionSerializer,
+    EmpruntSerializer, RemboursementSerializer
+)
+from .pagination import StandardResultsSetPagination
 
 
+# 1. TYPE MEMBER
 class TypeMemberViewSet(viewsets.ModelViewSet):
     queryset = TypeMember.objects.all()
     serializer_class = TypeMemberSerializer
-    permission_classes = [IsAdminUser] # Seul l'administrateur y a accès
+    pagination_class = StandardResultsSetPagination
 
 
+# 2. MEMBER
 class MemberViewSet(viewsets.ModelViewSet):
     queryset = Member.objects.all()
     serializer_class = MemberSerializer
-   # permission_classes = [IsAdminUser]
-
-    @action(detail=True, methods=['get'], url_path='statut-adhesion')
-    def verifier_adhesion(self, request, pk=None):
-        """Permet de vérifier via API si un membre est en ordre pour une année spécifique (par défaut l'année en cours)."""
-        membre = self.get_object()
-        annee = request.query_params.get('annee', timezone.now().year)
-        en_ordre = membre.est_en_ordre_adhesion(annee=int(annee))
-        return Response({'membre': membre.nom_complet, 'annee': annee, 'en_ordre': en_ordre})
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['nom_complet']
 
 
+# 3. ADHESION
 class AdhesionViewSet(viewsets.ModelViewSet):
-    queryset = Adhesion.objects.all()
+    queryset = Adhesion.objects.all().select_related('membre')
     serializer_class = AdhesionSerializer
-    permission_classes = [IsAdminUser]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['membre__nom_complet']
 
 
+# 4. SOCIAL
 class SocialViewSet(viewsets.ModelViewSet):
-    queryset = Social.objects.all()
+    queryset = Social.objects.all().select_related('membre')
     serializer_class = SocialSerializer
-    permission_classes = [IsAdminUser]
-
-    @action(detail=False, methods=['get'], url_path='point-semaine')
-    def point_semaine(self, request):
-        """Fait le point de la caisse 'Social' pour une semaine et une année données."""
-        semaine = request.query_params.get('semaine')
-        annee = request.query_params.get('annee', timezone.now().year)
-
-        if not semaine:
-            return Response({'error': "Le paramètre 'semaine' est obligatoire (1 à 53)."}, status=status.HTTP_400_BAD_REQUEST)
-
-        total = Social.somme_totale_semaine(semaine=int(semaine), annee=int(annee))
-        return Response({
-            'semaine': semaine,
-            'annee': annee,
-            'total_collecte': total
-        })
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['membre__nom_complet']
 
 
+# 5. COMPTE
 class CompteViewSet(viewsets.ModelViewSet):
-    queryset = Compte.objects.all()
+    queryset = Compte.objects.all().select_related('membre')
     serializer_class = CompteSerializer
-    permission_classes = [IsAdminUser]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['numero_compte']
+
+    @action(detail=False, methods=['get'], url_path='par-numero/(?P<numero>[^/.]+)')
+    def get_par_numero(self, request, numero=None):
+        try:
+            compte = self.queryset.get(numero_compte=numero)
+            serializer = self.get_serializer(compte)
+            return Response(serializer.data)
+        except Compte.DoesNotExist:
+            return Response({'error': 'Compte non trouvé'}, status=status.HTTP_404_NOT_FOUND)
 
 
+# 6. TRANSACTION
 class TransactionViewSet(viewsets.ModelViewSet):
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
-    permission_classes = [IsAdminUser]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['compte__numero_compte']
+
+    @action(detail=False, methods=['get'], url_path='compte/(?P<numero_compte>[^/.]+)')
+    def liste_par_compte(self, request, numero_compte=None):
+        transactions = self.queryset.filter(compte__numero_compte=numero_compte)
+        page = self.paginate_queryset(transactions)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(transactions, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'], url_path='par-annee')
+    def liste_par_annee(self, request):
+        annees = Transaction.objects.annotate(annee=ExtractYear('created_at')).values_list('annee', flat=True).distinct()
+        data = {}
+        for annee in annees:
+            if annee is not None:
+                trx_annee = Transaction.objects.filter(created_at__year=annee)
+                data[annee] = TransactionSerializer(trx_annee, many=True).data
+        return Response(data)
 
 
+# 7. EMPRUNT
 class EmpruntViewSet(viewsets.ModelViewSet):
-    queryset = Emprunt.objects.all()
+    queryset = Emprunt.objects.all().select_related('membre')
     serializer_class = EmpruntSerializer
-    permission_classes = [IsAdminUser]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['membre__nom_complet']
+
+    @action(detail=False, methods=['get'], url_path='par-annee')
+    def liste_par_annee(self, request):
+        annees = Emprunt.objects.annotate(annee=ExtractYear('date')).values_list('annee', flat=True).distinct()
+        data = {}
+        for annee in annees:
+            if annee is not None:
+                emprunts_annee = Emprunt.objects.filter(date__year=annee)
+                data[annee] = EmpruntSerializer(emprunts_annee, many=True).data
+        return Response(data)
 
 
+# 8. REMBOURSEMENT
 class RemboursementViewSet(viewsets.ModelViewSet):
-    queryset = Remboursement.objects.all()
+    queryset = Remboursement.objects.all().select_related('emprunt__membre')
     serializer_class = RemboursementSerializer
-    permission_classes = [IsAdminUser]
+    pagination_class = StandardResultsSetPagination
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['emprunt__membre__nom_complet']
+
+    @action(detail=False, methods=['get'], url_path='par-annee')
+    def liste_par_annee(self, request):
+        annees = Remboursement.objects.annotate(annee=ExtractYear('date')).values_list('annee', flat=True).distinct()
+        data = {}
+        for annee in annees:
+            if annee is not None:
+                remboursements_annee = Remboursement.objects.filter(date__year=annee)
+                data[annee] = RemboursementSerializer(remboursements_annee, many=True).data
+        return Response(data)
 
 
+# -------------------------------------------------------------
+# ENDPOINTS SPÉCIFIQUES (Statistiques & Totaux)
+# -------------------------------------------------------------
 
+@api_view(['GET'])
+def statistiques_totaux(request):
+    """Retourne l'ensemble des sommes totales demandées."""
+    total_epargne = Compte.objects.aggregate(total=Sum('balance')).get('total') or 0.00
+    total_social = Social.objects.aggregate(total=Sum('montant')).get('total') or 0.00
+    total_emprunt = Emprunt.objects.aggregate(total=Sum('montant_emprunt')).get('total') or 0.00
+    total_remboursement = Remboursement.objects.aggregate(total=Sum('montant')).get('total') or 0.00
+    total_adhesion = Adhesion.objects.aggregate(total=Sum('montant')).get('total') or 0.00
+
+    return Response({
+        'somme_totale_compte_epargne': total_epargne,
+        'somme_totale_social': total_social,
+        'somme_totale_emprunt': total_emprunt,
+        'somme_totale_remboursement': total_remboursement,
+        'somme_totale_adhesion': total_adhesion,
+    })
 
 
 # ======================= Git Pull  ==========================

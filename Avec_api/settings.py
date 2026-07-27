@@ -87,6 +87,10 @@ REST_FRAMEWORK = {
     ],
 }
 
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,
+}
 
 ROOT_URLCONF = 'Avec_api.urls'
 
@@ -126,11 +130,19 @@ DATABASES = {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'c2798164c_ceparcrea_bd',
         'USER': 'c2798164c_ceparcrea_user',
-        'PASSWORD': 'Admin_ceparcea@2026',
-        'HOST': '127.0.0.1',  # <-- Change 'localhost' par '127.0.0.1'
+        'PASSWORD': 'Admin_ceparcea@2026',  
+        'HOST': '127.0.0.1',
         'PORT': '3306',
+        'CONN_MAX_AGE': 0,                     
+        'OPTIONS': {
+            'ssl': False,                      
+            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+        }
     }
 }
+
+
+
 
 
 # Password validation

@@ -5,6 +5,8 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 from django.contrib.auth.models import AbstractUser
+import datetime
+
 
 
 class Utilisateur(AbstractUser):
@@ -67,6 +69,7 @@ class Adhesion(models.Model):
     membre = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='adhesions')
     annee = models.PositiveIntegerField()
     montant = models.DecimalField(max_digits=12, decimal_places=2)
+    devise = models.TextField()
     date = models.DateField(default=timezone.now)
 
     class Meta:
@@ -83,6 +86,7 @@ class Social(models.Model):
     semaine = models.PositiveIntegerField(validators=[MinValueValidator(1), MaxValueValidator(53)])
     annee = models.PositiveIntegerField()
     montant = models.DecimalField(max_digits=12, decimal_places=2)
+    devise = models.TextField()
     date = models.DateField(default=timezone.now)
 
     class Meta:
@@ -119,56 +123,35 @@ class Compte(models.Model):
         super().save(*args, **kwargs)
 
 
-# 6. TRANSACTIONS
 class Transaction(models.Model):
-    TYPE_TRANSACTION = [
-        ('depot', 'Dépôt'),
-        ('retrait', 'Retrait'),
-    ]
-    
-    compte = models.ForeignKey(Compte, on_delete=models.CASCADE, related_name='transactions')
-    type_transaction = models.CharField(max_length=10, choices=TYPE_TRANSACTION)
-    montant = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0.01)])
-    date = models.DateTimeField(default=timezone.now)
-    reference = models.CharField(max_length=50, unique=True, editable=False)
-
-    def __str__(self):
-        return f"{self.type_transaction.upper()} - {self.montant} ({self.reference})"
+    reference = models.CharField(max_length=30, unique=True, editable=False)
+    compte = models.ForeignKey('Compte', on_delete=models.CASCADE, related_name='transactions')
+    montant = models.DecimalField(max_digits=12, decimal_places=2)
+    type_transaction = models.CharField(max_length=20) # ex: DEPOT, RETRAIT
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def save(self, *args, **kwargs):
-        # Génération d'une référence unique pour la transaction
         if not self.reference:
-            self.reference = f"TX-{uuid.uuid4().hex[:10].upper()}"
-
-        # Utilisation d'une transaction SQL atomique pour mettre à jour la balance
-        with transaction.atomic():
-            # Sélection et verrouillage du compte pour éviter les accès concurrents (Race Conditions)
-            compte_lie = Compte.objects.select_for_update().get(id=self.compte.id)
-
-            if self.type_transaction == 'retrait':
-                # Vérification de l'ordre d'adhésion avant un retrait
-                if not compte_lie.membre.est_en_ordre_adhesion(annee=timezone.now().year):
-                    raise ValidationError("Le membre doit être en ordre d'adhésion pour l'année en cours avant d'effectuer un retrait.")
-                
-                # Vérification du solde suffisant
-                if compte_lie.balance < self.montant:
-                    raise ValidationError("Solde insuffisant pour effectuer ce retrait.")
-                
-                compte_lie.balance -= self.montant
+            today_str = datetime.date.today().strftime('%Y%m%d')
+            prefix = f"TRX-{today_str}-"
             
-            elif self.type_transaction == 'depot':
-                compte_lie.balance += self.montant
-
-            # Sauvegarde du compte mis à jour
-            compte_lie.save()
-            # Sauvegarde de la transaction elle-même
-            super().save(*args, **kwargs)
+            # Compte le nombre de transactions aujourd'hui pour incrémenter le numéro
+            last_trx = Transaction.objects.filter(reference__startswith=prefix).order_by('-id').first()
+            if last_trx:
+                last_number = int(last_trx.reference.split('-')[-1])
+                new_number = last_number + 1
+            else:
+                new_number = 1
+                
+            self.reference = f"{prefix}{new_number:04d}" # Résultat: TRX-20260727-0001
+        super().save(*args, **kwargs)
 
 
 # 7. EMPRUNTS
 class Emprunt(models.Model):
     membre = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='emprunts')
     montant_emprunt = models.DecimalField(max_digits=12, decimal_places=2)
+    devise = models.TextField()
     taux_interet = models.DecimalField(max_digits=5, decimal_places=2, help_text="En pourcentage (ex: 5 pour 5%)")
     total_a_payer = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
     balance = models.DecimalField(max_digits=12, decimal_places=2, editable=False, help_text="Ce qu'il reste à rembourser")
@@ -195,6 +178,7 @@ class Emprunt(models.Model):
 class Remboursement(models.Model):
     emprunt = models.ForeignKey(Emprunt, on_delete=models.CASCADE, related_name='remboursements')
     montant = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0.01)])
+    devise = models.TextField()
     date = models.DateField(default=timezone.now)
 
     def __str__(self):
