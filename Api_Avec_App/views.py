@@ -1,26 +1,34 @@
-from rest_framework import viewsets, status
+from rest_framework import generics, viewsets, status,filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser
-from django.utils import timezone
 from django.contrib.auth import authenticate
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
 from .models import TypeMember, Member, Adhesion, Social, Compte, Transaction, Emprunt, Remboursement, Utilisateur
 from .serializers import *
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.decorators import action, api_view
+from rest_framework.response import Response
+from django.db.models import Sum
+from django.db.models.functions import ExtractYear
+import subprocess
+from django.http import HttpResponse, HttpResponseForbidden
+from django.views.decorators.csrf import csrf_exempt
+from .models import *
+from .serializers import *
+from .pagination import StandardResultsSetPagination
+
 
 
 class UtilisateurViewSet(viewsets.ModelViewSet):
     queryset = Utilisateur.objects.all()
     serializer_class = UtilisateurSerializer
-    permission_classes = [IsAdminUser] # Seul un admin déjà connecté peut gérer les autres utilisateurs
-
+    permission_classes = [IsAdminUser] 
 
 
 class LoginAPIView(APIView):
-    # Cette vue doit être accessible à tout le monde pour pouvoir se connecter
+
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -64,44 +72,42 @@ class LoginAPIView(APIView):
             )
 
 
-from rest_framework import viewsets, filters, status
-from rest_framework.decorators import action, api_view
-from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
 
-from django.db.models import Sum
-from django.db.models.functions import ExtractYear
-import subprocess
-from django.http import HttpResponse, HttpResponseForbidden
-from django.views.decorators.csrf import csrf_exempt
+class LogoutAPIView(APIView):
+    
+    permission_classes = [IsAuthenticated]
 
-from .models import (
-    TypeMember, Member, Adhesion, Social, 
-    Compte, Transaction, Emprunt, Remboursement
-)
-from .serializers import (
-    TypeMemberSerializer, MemberSerializer, AdhesionSerializer,
-    SocialSerializer, CompteSerializer, TransactionSerializer,
-    EmpruntSerializer, RemboursementSerializer
-)
-from .pagination import StandardResultsSetPagination
+    def post(self, request):
+        try:
+            
+            request.user.auth_token.delete()
+            return Response(
+                {'message': 'Déconnexion réussie.'}, 
+                status=status.HTTP_200_OK
+            )
+        except Exception:
+            return Response(
+                {'error': 'Une erreur est survenue lors de la déconnexion.'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
 
 
 # 1. TYPE MEMBER
-class TypeMemberViewSet(viewsets.ModelViewSet):
-    queryset = TypeMember.objects.all()
-    serializer_class = TypeMemberSerializer
-    pagination_class = StandardResultsSetPagination
-    from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 class TypeMemberViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAdminUser]
     queryset = TypeMember.objects.all()
     serializer_class = TypeMemberSerializer
     pagination_class = StandardResultsSetPagination
-    permission_classes = [IsAuthenticatedOrReadOnly] # Permet le GET public
+
+
 
 
 # 2. MEMBER
 class MemberViewSet(viewsets.ModelViewSet):
+   # permission_classes = [IsAdminUser]
     queryset = Member.objects.all()
     serializer_class = MemberSerializer
     pagination_class = StandardResultsSetPagination
@@ -111,6 +117,7 @@ class MemberViewSet(viewsets.ModelViewSet):
 
 # 3. ADHESION
 class AdhesionViewSet(viewsets.ModelViewSet):
+    #permission_classes = [IsAdminUser]
     queryset = Adhesion.objects.all().select_related('membre')
     serializer_class = AdhesionSerializer
     pagination_class = StandardResultsSetPagination
@@ -120,6 +127,7 @@ class AdhesionViewSet(viewsets.ModelViewSet):
 
 # 4. SOCIAL
 class SocialViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAdminUser]
     queryset = Social.objects.all().select_related('membre')
     serializer_class = SocialSerializer
     pagination_class = StandardResultsSetPagination
@@ -129,6 +137,7 @@ class SocialViewSet(viewsets.ModelViewSet):
 
 # 5. COMPTE
 class CompteViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAdminUser]
     queryset = Compte.objects.all().select_related('membre')
     serializer_class = CompteSerializer
     pagination_class = StandardResultsSetPagination
@@ -147,6 +156,8 @@ class CompteViewSet(viewsets.ModelViewSet):
 
 # 6. TRANSACTION
 class TransactionViewSet(viewsets.ModelViewSet):
+
+    #permission_classes = [IsAdminUser]
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
     pagination_class = StandardResultsSetPagination
@@ -176,6 +187,7 @@ class TransactionViewSet(viewsets.ModelViewSet):
 
 # 7. EMPRUNT
 class EmpruntViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAdminUser]
     queryset = Emprunt.objects.all().select_related('membre')
     serializer_class = EmpruntSerializer
     pagination_class = StandardResultsSetPagination
@@ -195,6 +207,8 @@ class EmpruntViewSet(viewsets.ModelViewSet):
 
 # 8. REMBOURSEMENT
 class RemboursementViewSet(viewsets.ModelViewSet):
+    
+    permission_classes = [IsAdminUser]
     queryset = Remboursement.objects.all().select_related('emprunt__membre')
     serializer_class = RemboursementSerializer
     pagination_class = StandardResultsSetPagination
@@ -232,6 +246,56 @@ def statistiques_totaux(request):
         'somme_totale_remboursement': total_remboursement,
         'somme_totale_adhesion': total_adhesion,
     })
+
+
+
+
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from .models import ArticleCantine, CreditCantine, RemboursementCantine
+from .serializers import (
+    ArticleCantineSerializer,
+    CreditCantineDetailSerializer,
+    CreditCantineCreateSerializer,
+    CreditCantineGroupedResponseSerializer,
+    RemboursementCantineSerializer
+)
+
+class ArticleCantineViewSet(viewsets.ModelViewSet):
+    queryset = ArticleCantine.objects.all()
+    serializer_class = ArticleCantineSerializer
+
+
+class CreditCantineViewSet(viewsets.ModelViewSet):
+    queryset = CreditCantine.objects.select_related('membre').prefetch_related('lignes__article')
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return CreditCantineCreateSerializer
+        return CreditCantineDetailSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_validate(raise_exception=True)
+        credit = serializer.save()
+        
+        # Retourne les détails du crédit créé
+        response_serializer = CreditCantineDetailSerializer(credit)
+        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+
+    # Action personnalisée pour obtenir la réponse groupée au format spécifique
+    @action(detail=False, methods=['get'], url_path='groupes-par-membre')
+    def groupes_par_membre(self, request):
+        credits = self.get_queryset()
+        serializer = CreditCantineGroupedResponseSerializer()
+        return Response({"data": serializer.to_representation(credits)})
+
+
+class RemboursementCantineViewSet(viewsets.ModelViewSet):
+    queryset = RemboursementCantine.objects.all()
+    serializer_class = RemboursementCantineSerializer
+
 
 
 # ======================= Git Pull  ==========================

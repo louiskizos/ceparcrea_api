@@ -8,7 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-)by5(63t9u_+s!@-j41yzybz77m8*of&z2(1=c4v!0cf160n2$'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ['ceparcrea.acedh-rdc.org', 'www.ceparcrea.acedh-rdc.org', '127.0.0.1', 'localhost']
 
@@ -87,8 +87,14 @@ REST_FRAMEWORK = {
 # CORS CONFIGURATION
 # -------------------------------------------------------------
 
-CORS_ALLOW_ALL_ORIGINS = True
+
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "https://aprepos.vercel.app",
+]
 CORS_ALLOW_CREDENTIALS = False
+SECURE_SSL_REDIRECT = False 
 CORS_ALLOW_HEADERS = [
     "content-type",
     "authorization",
@@ -103,19 +109,26 @@ CORS_ALLOW_HEADERS = [
 # DATABASE
 # -------------------------------------------------------------
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'c2798164c_ceparcrea_bd',
+#         'USER': 'c2798164c_ceparcrea_user',
+#         'PASSWORD': 'Admin_ceparcea@2026',  
+#         'HOST': '127.0.0.1',
+#         'PORT': '3306',
+#         'CONN_MAX_AGE': 0,                     
+#         'OPTIONS': {
+#             'ssl': False,                      
+#             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+#         }
+#     }
+# }
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'c2798164c_ceparcrea_bd',
-        'USER': 'c2798164c_ceparcrea_user',
-        'PASSWORD': 'Admin_ceparcea@2026',  
-        'HOST': '127.0.0.1',
-        'PORT': '3306',
-        'CONN_MAX_AGE': 0,                     
-        'OPTIONS': {
-            'ssl': False,                      
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-        }
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 

@@ -2,8 +2,8 @@ from django.test import TestCase
 
 # Create your tests here.
 # {
-#     "username": "Avec_admin",
-#     "password": "AdminAvec@2026"
+#     "username": "test2",
+#     "password": "1234"
 # }
 
 # Username: Admin_test
