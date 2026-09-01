@@ -402,92 +402,115 @@ class Remboursement(models.Model):
             emprunt_lie.save()
             super().delete(*args, **kwargs)
 
-
 # ---------------------------------------------------------
-# 5. CANTINE (ARTICLES, CREDIT CANTINE, REMBOURSEMENT)
+# 5. CREDIT CANTINE & ACHATS EN PANIER
 # ---------------------------------------------------------
-class ArticleCantine(models.Model):
+class ProduitCantine(models.Model):
     nom = models.CharField(max_length=150)
-    prix_unitaire = models.DecimalField(max_digits=12, decimal_places=2)
+    prix_unitaire = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0.01)])
+    devise = models.CharField(max_length=3, choices=DEVISE_CHOICES, default='cdf')
     stock = models.PositiveIntegerField(default=0)
-    description = models.TextField(blank=True, null=True)
 
     def __str__(self):
-        return f"{self.nom} - {self.prix_unitaire}"
+        return f"{self.nom} - {self.prix_unitaire} {self.devise.upper()} (Stock: {self.stock})"
 
 
 class CreditCantine(models.Model):
     membre = models.ForeignKey(Member, on_delete=models.CASCADE, related_name='credits_cantine')
-    montant_total = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, editable=False)
+    acompte_initial = models.DecimalField(
+        max_digits=12, 
+        decimal_places=2, 
+        default=0.00, 
+        validators=[MinValueValidator(0.00)],
+        help_text="Montant déposé au départ avant de retirer les produits"
+    )
+    montant_total_panier = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, editable=False)
     balance = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, editable=False, help_text="Reste à payer")
     devise = models.CharField(max_length=3, choices=DEVISE_CHOICES, default='cdf')
     date = models.DateField(default=timezone.now)
 
     def __str__(self):
-        return f"Crédit Cantine N°{self.id} - {self.membre.nom_complet} (Reste: {self.balance})"
+        return f"Crédit Cantine {self.id} - {self.membre.nom_complet} (Reste: {self.balance})"
 
-    def recalculer_totaux(self):
-        """Met à jour le montant total du panier et réajuste la balance."""
-        totaux = self.lignes.aggregate(total=models.Sum('prix_total'))['total'] or 0.00
-        somme_remboursements = self.remboursements.aggregate(total=models.Sum('montant'))['total'] or 0.00
+    def clean(self):
+        if not self.pk:
+            annee_credit = self.date.year if self.date else timezone.now().year
+            if not self.membre.est_en_ordre_adhesion(annee=annee_credit):
+                raise ValidationError("Le membre doit être en ordre d'adhésion pour l'année concernée.")
+
+    def update_totals(self):
+        """ Recalcule le total du panier et la balance restante. """
+        total = sum(item.sous_total for item in self.lignes.all())
+        self.montant_total_panier = total
         
-        self.montant_total = totaux
-        self.balance = totaux - somme_remboursements
-        self.save(update_fields=['montant_total', 'balance'])
+        # Total déjà remboursé en plus de l'acompte
+        total_rembourse = sum(r.montant for r in self.remboursements_cantine.all())
+        
+        self.balance = (self.montant_total_panier - self.acompte_initial) - total_rembourse
+        if self.balance < 0:
+            self.balance = 0.00
+        
+        self.save()
 
 
 class LigneCreditCantine(models.Model):
-    """Représente chaque article présent dans le panier de crédit cantine."""
     credit_cantine = models.ForeignKey(CreditCantine, on_delete=models.CASCADE, related_name='lignes')
-    article = models.ForeignKey(ArticleCantine, on_delete=models.PROTECT, related_name='lignes_credit')
-    quantite = models.PositiveIntegerField(validators=[MinValueValidator(1)])
-    prix_unitaire = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
-    prix_total = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
+    produit = models.ForeignKey(ProduitCantine, on_delete=models.PROTECT)
+    quantite = models.PositiveIntegerField(default=1, validators=[MinValueValidator(1)])
+    prix_unitaire_applique = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
+    sous_total = models.DecimalField(max_digits=12, decimal_places=2, editable=False)
+
+    def clean(self):
+        # Vérification du stock disponible
+        if not self.pk and self.produit.stock < self.quantite:
+            raise ValidationError(f"Stock insuffisant pour {self.produit.nom}. Disponible: {self.produit.stock}")
 
     def save(self, *args, **kwargs):
-        if not self.pk:
-            # Fixe le prix unitaire au prix actuel de l'article au moment du crédit
-            self.prix_unitaire = self.article.prix_unitaire
-        
-        self.prix_total = self.prix_unitaire * self.quantite
-        super().save(*args, **kwargs)
-        # Met à jour automatiquement la balance du crédit cantine parent
-        self.credit_cantine.recalculer_totaux()
+        with transaction.atomic():
+            if not self.pk:
+                self.full_clean()
+                # Déduire du stock du produit
+                self.produit.stock -= self.quantite
+                self.produit.save()
+                
+                # Figer le prix au moment de l'achat
+                self.prix_unitaire_applique = self.produit.prix_unitaire
+
+            self.sous_total = self.prix_unitaire_applique * self.quantite
+            super().save(*args, **kwargs)
+            
+            # Mettre à jour la balance globale du panier
+            self.credit_cantine.update_totals()
 
     def delete(self, *args, **kwargs):
-        credit = self.credit_cantine
-        super().delete(*args, **kwargs)
-        credit.recalculer_totaux()
+        with transaction.atomic():
+            # Remettre la quantité en stock si la ligne est supprimée
+            self.produit.stock += self.quantite
+            self.produit.save()
+            super().delete(*args, **kwargs)
+            self.credit_cantine.update_totals()
 
 
 class RemboursementCantine(models.Model):
-    credit_cantine = models.ForeignKey(CreditCantine, on_delete=models.CASCADE, related_name='remboursements')
+    credit_cantine = models.ForeignKey(CreditCantine, on_delete=models.CASCADE, related_name='remboursements_cantine')
     montant = models.DecimalField(max_digits=12, decimal_places=2, validators=[MinValueValidator(0.01)])
     devise = models.CharField(max_length=3, choices=DEVISE_CHOICES, default='cdf')
     date = models.DateField(default=timezone.now)
 
     def __str__(self):
-        return f"Remboursement Cantine de {self.montant} sur Crédit N°{self.credit_cantine.id}"
+        return f"Remboursement Cantine de {self.montant} sur Crédit #{self.credit_cantine.id}"
+
+    def clean(self):
+        if self.montant > self.credit_cantine.balance:
+            raise ValidationError(f"Le montant dépasse la balance restante du crédit cantine ({self.credit_cantine.balance}).")
 
     def save(self, *args, **kwargs):
         with transaction.atomic():
-            credit_lie = CreditCantine.objects.select_for_update().get(id=self.credit_cantine_id)
-            if self.pk:
-                ancien_remboursement = RemboursementCantine.objects.get(pk=self.pk)
-                delta = self.montant - ancien_remboursement.montant
-            else:
-                delta = self.montant
-
-            if delta > credit_lie.balance:
-                raise ValidationError(f"Le montant dépasse la dette de cantine restante ({credit_lie.balance}).")
-
-            credit_lie.balance -= delta
-            credit_lie.save(update_fields=['balance'])
+            self.full_clean()
             super().save(*args, **kwargs)
+            self.credit_cantine.update_totals()
 
     def delete(self, *args, **kwargs):
         with transaction.atomic():
-            credit_lie = CreditCantine.objects.select_for_update().get(id=self.credit_cantine_id)
-            credit_lie.balance += self.montant
-            credit_lie.save(update_fields=['balance'])
             super().delete(*args, **kwargs)
+            self.credit_cantine.update_totals()

@@ -24,13 +24,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
-    # Third party apps
-    'corsheaders',  # Requis pour CorsMiddleware
+    'corsheaders',  
     'rest_framework',
     'rest_framework.authtoken',
-    
-    # Local apps
+    'django_filters',
     'Api_Avec_App',
 ]
 

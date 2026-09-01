@@ -6,8 +6,7 @@ from django.contrib.auth import authenticate
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
-from .models import TypeMember, Member, Adhesion, Social, Compte, Transaction, Emprunt, Remboursement, Utilisateur
-from .serializers import *
+from .models import *
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from django.db.models import Sum
@@ -18,6 +17,8 @@ from django.views.decorators.csrf import csrf_exempt
 from .models import *
 from .serializers import *
 from .pagination import StandardResultsSetPagination
+from django_filters.rest_framework import DjangoFilterBackend
+
 
 
 
@@ -107,7 +108,7 @@ class TypeMemberViewSet(viewsets.ModelViewSet):
 
 # 2. MEMBER
 class MemberViewSet(viewsets.ModelViewSet):
-   # permission_classes = [IsAdminUser]
+    #permission_classes = [IsAdminUser]
     queryset = Member.objects.all()
     serializer_class = MemberSerializer
     pagination_class = StandardResultsSetPagination
@@ -117,7 +118,7 @@ class MemberViewSet(viewsets.ModelViewSet):
 
 # 3. ADHESION
 class AdhesionViewSet(viewsets.ModelViewSet):
-    #permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminUser]
     queryset = Adhesion.objects.all().select_related('membre')
     serializer_class = AdhesionSerializer
     pagination_class = StandardResultsSetPagination
@@ -157,7 +158,7 @@ class CompteViewSet(viewsets.ModelViewSet):
 # 6. TRANSACTION
 class TransactionViewSet(viewsets.ModelViewSet):
 
-    #permission_classes = [IsAdminUser]
+    permission_classes = [IsAdminUser]
     queryset = Transaction.objects.all()
     serializer_class = TransactionSerializer
     pagination_class = StandardResultsSetPagination
@@ -248,54 +249,54 @@ def statistiques_totaux(request):
     })
 
 
-
-
-from rest_framework import viewsets, status
-from rest_framework.decorators import action
-from rest_framework.response import Response
-from .models import ArticleCantine, CreditCantine, RemboursementCantine
-from .serializers import (
-    ArticleCantineSerializer,
-    CreditCantineDetailSerializer,
-    CreditCantineCreateSerializer,
-    CreditCantineGroupedResponseSerializer,
-    RemboursementCantineSerializer
-)
-
-class ArticleCantineViewSet(viewsets.ModelViewSet):
-    queryset = ArticleCantine.objects.all()
-    serializer_class = ArticleCantineSerializer
+class ProduitCantineViewSet(viewsets.ModelViewSet):
+    queryset = ProduitCantine.objects.all()
+    serializer_class = ProduitCantineSerializer
+    filter_backends = [filters.SearchFilter, DjangoFilterBackend]
+    search_fields = ['nom']
 
 
 class CreditCantineViewSet(viewsets.ModelViewSet):
-    queryset = CreditCantine.objects.select_related('membre').prefetch_related('lignes__article')
+    permission_classes = [IsAdminUser]
+    queryset = CreditCantine.objects.all().order_by('-date')
+    serializer_class = CreditCantineSerializer
+    filter_backends = [filters.SearchFilter, DjangoFilterBackend]
+    filterset_fields = ['membre', 'devise']
+    search_fields = ['membre__nom_complet']
 
-    def get_serializer_class(self):
-        if self.action == 'create':
-            return CreditCantineCreateSerializer
-        return CreditCantineDetailSerializer
-
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_validate(raise_exception=True)
-        credit = serializer.save()
+    @action(detail=True, methods=['post'], url_path='ajouter-produit')
+    def ajouter_produit(self, request, pk=None):
+        """
+        Action personnalisée pour ajouter un produit directement au panier d'un crédit cantine existant.
+        Payload attendu: {"produit": 1, "quantite": 2}
+        """
+        credit = self.get_object()
+        serializer = LigneCreditCantineSerializer(data={
+            'credit_cantine': credit.id,
+            'produit': request.data.get('produit'),
+            'quantite': request.data.get('quantite', 1)
+        })
         
-        # Retourne les détails du crédit créé
-        response_serializer = CreditCantineDetailSerializer(credit)
-        return Response(response_serializer.data, status=status.HTTP_201_CREATED)
+        if serializer.is_valid():
+            serializer.save()
+            # Recharger les données à jour de la commande
+            credit_serializer = self.get_serializer(credit)
+            return Response(credit_serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-    # Action personnalisée pour obtenir la réponse groupée au format spécifique
-    @action(detail=False, methods=['get'], url_path='groupes-par-membre')
-    def groupes_par_membre(self, request):
-        credits = self.get_queryset()
-        serializer = CreditCantineGroupedResponseSerializer()
-        return Response({"data": serializer.to_representation(credits)})
+
+class LigneCreditCantineViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsAdminUser]
+    queryset = LigneCreditCantine.objects.all()
+    serializer_class = LigneCreditCantineSerializer
+    filterset_fields = ['credit_cantine']
 
 
 class RemboursementCantineViewSet(viewsets.ModelViewSet):
-    queryset = RemboursementCantine.objects.all()
+    permission_classes = [IsAdminUser]
+    queryset = RemboursementCantine.objects.all().order_by('-date')
     serializer_class = RemboursementCantineSerializer
-
+    filterset_fields = ['credit_cantine']
 
 
 # ======================= Git Pull  ==========================
