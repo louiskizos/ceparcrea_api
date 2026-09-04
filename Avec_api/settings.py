@@ -106,28 +106,28 @@ CORS_ALLOW_HEADERS = [
 # DATABASE
 # -------------------------------------------------------------
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'c2798164c_ceparcrea_bd',
-        'USER': 'c2798164c_ceparcrea_user',
-        'PASSWORD': 'Admin_ceparcea@2026',  
-        'HOST': '127.0.0.1',
-        'PORT': '3306',
-        'CONN_MAX_AGE': 0,                     
-        'OPTIONS': {
-            'ssl': False,                      
-            'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-        }
-    }
-}
-
 # DATABASES = {
 #     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
+#         'ENGINE': 'django.db.backends.mysql',
+#         'NAME': 'c2798164c_ceparcrea_bd',
+#         'USER': 'c2798164c_ceparcrea_user',
+#         'PASSWORD': 'Admin_ceparcea@2026',  
+#         'HOST': '127.0.0.1',
+#         'PORT': '3306',
+#         'CONN_MAX_AGE': 0,                     
+#         'OPTIONS': {
+#             'ssl': False,                      
+#             'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
+#         }
 #     }
 # }
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
+    }
+}
 
 
 # -------------------------------------------------------------

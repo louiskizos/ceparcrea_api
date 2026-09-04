@@ -1,4 +1,5 @@
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/c2798164c/ceparcrea/
+    - export DEPLOYPATH=/home/c2798164c/repositories/ceparcrea_api/
     - /bin/cp -R * $DEPLOYPATH
+    - touch /home/c2798164c/repositories/ceparcrea_api/passenger_wsgi.py
