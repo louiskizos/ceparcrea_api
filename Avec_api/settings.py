@@ -110,7 +110,7 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'c2798164c_ceparcrea_bd',
-        'USER': 'c2798164c_ceparcrea_user',
+        'USER': 'c2798164c_ceparcrea_users',
         'PASSWORD': 'Admin_ceparcea@2026',  
         'HOST': '127.0.0.1',
         'PORT': '3306',
