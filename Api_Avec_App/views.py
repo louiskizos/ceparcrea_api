@@ -1,14 +1,11 @@
-from rest_framework import generics, viewsets, status,filters
-from rest_framework.decorators import action
+from rest_framework import  viewsets, status,filters
+from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
-from rest_framework.permissions import IsAdminUser
+from rest_framework.permissions import IsAdminUser, IsAuthenticated
 from django.contrib.auth import authenticate
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import AllowAny
-from .models import *
-from rest_framework.decorators import action, api_view
-from rest_framework.response import Response
 from django.db.models import Sum
 from django.db.models.functions import ExtractYear
 import subprocess
@@ -18,6 +15,7 @@ from .models import *
 from .serializers import *
 from .pagination import StandardResultsSetPagination
 from django_filters.rest_framework import DjangoFilterBackend
+
 
 
 
@@ -36,28 +34,24 @@ class LoginAPIView(APIView):
         username = request.data.get('username')
         password = request.data.get('password')
 
-        # 1. Vérifier si les champs sont fournis
         if not username or not password:
             return Response(
                 {'error': 'Veuillez fournir un nom d’utilisateur et un mot de passe.'}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # 2. Authentifier l'utilisateur
         user = authenticate(username=username, password=password)
 
         if user is not None:
-            # 3. Vérifier que l'utilisateur est bien un membre du personnel/admin
+
             if not user.is_staff:
                 return Response(
                     {'error': 'Accès refusé. Seuls les administrateurs peuvent se connecter.'}, 
                     status=status.HTTP_403_FORBIDDEN
                 )
             
-            # 4. Récupérer ou créer un jeton (Token) pour cet utilisateur
             token, created = Token.objects.get_or_create(user=user)
             
-            # 5. Renvoyer la réponse avec le jeton et les infos de l'utilisateur
             return Response({
                 'token': token.key,
                 'user_id': user.id,
@@ -72,8 +66,6 @@ class LoginAPIView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-
-from rest_framework.permissions import IsAuthenticated
 
 class LogoutAPIView(APIView):
     
@@ -116,6 +108,14 @@ class MemberViewSet(viewsets.ModelViewSet):
     search_fields = ['nom_complet']
 
 
+class MemberListViewSet(viewsets.ReadOnlyModelViewSet):
+    
+    permission_classes = [IsAdminUser] 
+    queryset = Member.objects.all()
+    serializer_class = MemberSerializer
+    pagination_class = None
+    filter_backends = []
+
 # 3. ADHESION
 class AdhesionViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminUser]
@@ -126,6 +126,14 @@ class AdhesionViewSet(viewsets.ModelViewSet):
     search_fields = ['membre__nom_complet']
 
 
+class AdhesionListViewSet(viewsets.ReadOnlyModelViewSet):
+    
+    permission_classes = [IsAdminUser] 
+    queryset = Adhesion.objects.all().select_related('membre')
+    serializer_class = AdhesionSerializer
+    pagination_class = None
+    filter_backends = []
+
 # 4. SOCIAL
 class SocialViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminUser]
@@ -134,6 +142,15 @@ class SocialViewSet(viewsets.ModelViewSet):
     pagination_class = StandardResultsSetPagination
     filter_backends = [filters.SearchFilter]
     search_fields = ['membre__nom_complet']
+
+
+class SocialListViewSet(viewsets.ReadOnlyModelViewSet):
+    
+    permission_classes = [IsAdminUser] 
+    queryset = Social.objects.all().select_related('membre')
+    serializer_class = SocialSerializer
+    pagination_class = None
+    filter_backends = []
 
 
 # 5. COMPTE
@@ -154,6 +171,24 @@ class CompteViewSet(viewsets.ModelViewSet):
         except Compte.DoesNotExist:
             return Response({'error': 'Compte non trouvé'}, status=status.HTTP_404_NOT_FOUND)
 
+
+class CompteListViewSet(viewsets.ReadOnlyModelViewSet):
+    
+    permission_classes = [IsAdminUser]
+    queryset = Compte.objects.all().select_related('membre')
+    serializer_class = CompteSerializer
+    
+    pagination_class = None
+    filter_backends = []
+
+    @action(detail=False, methods=['get'], url_path='par-numero/(?P<numero>[^/.]+)')
+    def get_par_numero(self, request, numero=None):
+        try:
+            compte = self.queryset.get(numero_compte=numero)
+            serializer = self.get_serializer(compte)
+            return Response(serializer.data)
+        except Compte.DoesNotExist:
+            return Response({'error': 'Compte non trouvé'}, status=status.HTTP_404_NOT_FOUND)
 
 # 6. TRANSACTION
 class TransactionViewSet(viewsets.ModelViewSet):
@@ -233,7 +268,8 @@ class RemboursementViewSet(viewsets.ModelViewSet):
 
 @api_view(['GET'])
 def statistiques_totaux(request):
-    """Retourne l'ensemble des sommes totales demandées."""
+
+
     total_epargne = Compte.objects.aggregate(total=Sum('balance')).get('total') or 0.00
     total_social = Social.objects.aggregate(total=Sum('montant')).get('total') or 0.00
     total_emprunt = Emprunt.objects.aggregate(total=Sum('montant_emprunt')).get('total') or 0.00
@@ -250,6 +286,8 @@ def statistiques_totaux(request):
 
 
 class ProduitCantineViewSet(viewsets.ModelViewSet):
+
+    permission_classes = [IsAdminUser]
     queryset = ProduitCantine.objects.all()
     serializer_class = ProduitCantineSerializer
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
@@ -266,10 +304,7 @@ class CreditCantineViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='ajouter-produit')
     def ajouter_produit(self, request, pk=None):
-        """
-        Action personnalisée pour ajouter un produit directement au panier d'un crédit cantine existant.
-        Payload attendu: {"produit": 1, "quantite": 2}
-        """
+        
         credit = self.get_object()
         serializer = LigneCreditCantineSerializer(data={
             'credit_cantine': credit.id,

@@ -16,6 +16,10 @@ router.register(r'cantine/produits', ProduitCantineViewSet, basename='produit-ca
 router.register(r'cantine/credits', CreditCantineViewSet, basename='credit-cantine')
 router.register(r'cantine/lignes-panier', LigneCreditCantineViewSet, basename='ligne-credit-cantine')
 router.register(r'cantine/remboursements', RemboursementCantineViewSet, basename='remboursement-cantine')
+router.register(r'liste_membres', MemberListViewSet, basename='liste-membres')
+router.register(r'liste_adhesions', AdhesionListViewSet, basename='liste-adhesions')
+router.register(r'liste_socials', SocialListViewSet, basename='liste-socials')
+router.register(r'liste_comptes', CompteListViewSet, basename='liste-comptes')
 
 urlpatterns = [
     path('', include(router.urls)),
