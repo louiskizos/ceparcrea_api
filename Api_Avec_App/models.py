@@ -224,7 +224,8 @@ DEVISE_CHOICES = (
 class Utilisateur(AbstractUser):
     ROLE_CHOICES = (
         ('admin', 'Admin'),
-        ('agent', 'Agent'),
+        ('agent_credit', "Agent Credit"),
+        ('agent_cantine', "Agent Cantine"),
     )
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='agent')
     telephone = models.CharField(max_length=20, blank=True, null=True)
