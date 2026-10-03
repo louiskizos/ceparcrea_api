@@ -26,6 +26,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'drf_spectacular',
     'rest_framework.authtoken',
     'django_filters',
     'Api_Avec_App',
@@ -71,12 +72,46 @@ WSGI_APPLICATION = 'Avec_api.wsgi.application'
 AUTH_USER_MODEL = 'Api_Avec_App.Utilisateur'
 
 REST_FRAMEWORK = {
+    # Authentification
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.TokenAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
+    # Pagination
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    # Documentation OpenAPI / Swagger
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+SPECTACULAR_SETTINGS = {
+    # Titre principal affiché tout en haut de Swagger UI
+    'TITLE': 'CEPARCREA API',
+    
+    # Description complète (supporte le format Markdown)
+    'DESCRIPTION': '''
+    ### Documentation officielle de l'API CEPARCREA
+    
+    Cette API permet de gérer :
+    * Les membres, cotisations sociales et adhésions.
+    * Les comptes d'épargne, transactions, emprunts et remboursements.
+    * Le système de cantine et crédits associés.
+    
+    Pour tester les endpoints sécurisés, cliquez sur le bouton **Authorize** ci-dessous et entrez votre token sous la forme : `Token <votre_token_ici>`.
+    ''',
+    
+    # Version de votre API
+    'VERSION': '1.0.0',
+    
+    'SERVE_INCLUDE_SCHEMA': False,
+    
+    # Permet d'ajouter des informations de contact / licence (Optionnel)
+    'CONTACT': {
+        'name': 'Support Technique CEPARCREA',
+        'email': 'altspace@ceparcrea.org',
+    },
+    
+    # Schéma d'authentification pour afficher le bouton 'Authorize'
+    'SECURITY': [{'tokenAuth': []}],
 }
 
 
